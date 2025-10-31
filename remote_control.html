@@ -1,0 +1,505 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ESP32 远程控制面板</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      padding: 20px;
+    }
+    
+    .container {
+      background: white;
+      border-radius: 20px;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+      max-width: 600px;
+      width: 100%;
+      padding: 40px;
+    }
+    
+    h1 {
+      color: #333;
+      margin-bottom: 10px;
+      font-size: 28px;
+    }
+    
+    .subtitle {
+      color: #666;
+      margin-bottom: 30px;
+      font-size: 14px;
+    }
+    
+    .config-section {
+      background: #f8f9fa;
+      padding: 20px;
+      border-radius: 10px;
+      margin-bottom: 30px;
+    }
+    
+    .config-section h3 {
+      color: #555;
+      margin-bottom: 15px;
+      font-size: 16px;
+    }
+    
+    .input-group {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 15px;
+    }
+    
+    input[type="text"] {
+      flex: 1;
+      padding: 12px;
+      border: 2px solid #e0e0e0;
+      border-radius: 8px;
+      font-size: 14px;
+      transition: border-color 0.3s;
+    }
+    
+    input[type="text"]:focus {
+      outline: none;
+      border-color: #667eea;
+    }
+    
+    .status-card {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      padding: 20px;
+      border-radius: 15px;
+      margin-bottom: 25px;
+    }
+    
+    .status-card h3 {
+      margin-bottom: 15px;
+      font-size: 18px;
+    }
+    
+    .status-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 15px;
+    }
+    
+    .status-item {
+      background: rgba(255, 255, 255, 0.2);
+      padding: 12px;
+      border-radius: 8px;
+      backdrop-filter: blur(10px);
+    }
+    
+    .status-label {
+      font-size: 12px;
+      opacity: 0.9;
+      margin-bottom: 5px;
+    }
+    
+    .status-value {
+      font-size: 18px;
+      font-weight: bold;
+    }
+    
+    .control-section {
+      margin-bottom: 25px;
+    }
+    
+    .control-section h3 {
+      color: #333;
+      margin-bottom: 15px;
+      font-size: 18px;
+    }
+    
+    .button-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 10px;
+    }
+    
+    button {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      border: none;
+      padding: 15px 20px;
+      border-radius: 10px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.3s;
+      box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+    }
+    
+    button:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 20px rgba(102, 126, 234, 0.6);
+    }
+    
+    button:active {
+      transform: translateY(0);
+    }
+    
+    button.secondary {
+      background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+      box-shadow: 0 4px 15px rgba(245, 87, 108, 0.4);
+    }
+    
+    button.secondary:hover {
+      box-shadow: 0 6px 20px rgba(245, 87, 108, 0.6);
+    }
+    
+    button.success {
+      background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+      box-shadow: 0 4px 15px rgba(79, 172, 254, 0.4);
+    }
+    
+    button.full-width {
+      grid-column: 1 / -1;
+    }
+    
+    .message-input {
+      width: 100%;
+      padding: 12px;
+      border: 2px solid #e0e0e0;
+      border-radius: 8px;
+      font-size: 14px;
+      margin-bottom: 10px;
+      transition: border-color 0.3s;
+    }
+    
+    .message-input:focus {
+      outline: none;
+      border-color: #667eea;
+    }
+    
+    .alert {
+      padding: 12px 15px;
+      border-radius: 8px;
+      margin-bottom: 20px;
+      display: none;
+    }
+    
+    .alert.show {
+      display: block;
+      animation: slideIn 0.3s ease-out;
+    }
+    
+    .alert.success {
+      background: #d4edda;
+      color: #155724;
+      border-left: 4px solid #28a745;
+    }
+    
+    .alert.error {
+      background: #f8d7da;
+      color: #721c24;
+      border-left: 4px solid #dc3545;
+    }
+    
+    @keyframes slideIn {
+      from {
+        opacity: 0;
+        transform: translateY(-10px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+    
+    .loading {
+      display: inline-block;
+      width: 12px;
+      height: 12px;
+      border: 2px solid rgba(255,255,255,0.3);
+      border-radius: 50%;
+      border-top-color: white;
+      animation: spin 0.8s linear infinite;
+      margin-left: 8px;
+    }
+    
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+    
+    .connection-indicator {
+      display: inline-block;
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      margin-right: 8px;
+    }
+    
+    .connection-indicator.connected {
+      background: #28a745;
+      box-shadow: 0 0 10px #28a745;
+    }
+    
+    .connection-indicator.disconnected {
+      background: #dc3545;
+      box-shadow: 0 0 10px #dc3545;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>🎮 ESP32 远程控制面板</h1>
+    <p class="subtitle">通过Web API控制您的ESP32设备</p>
+    
+    <!-- 配置区域 -->
+    <div class="config-section">
+      <h3>⚙️ 设备配置</h3>
+      <div class="input-group">
+        <input type="text" id="deviceIP" placeholder="输入ESP32的IP地址 (例: 192.168.4.1)" value="192.168.4.1">
+        <button onclick="connectDevice()" class="success">连接</button>
+      </div>
+    </div>
+    
+    <!-- 提示信息 -->
+    <div id="alert" class="alert"></div>
+    
+    <!-- 状态卡片 -->
+    <div class="status-card">
+      <h3>
+        <span class="connection-indicator" id="connectionIndicator"></span>
+        设备状态
+      </h3>
+      <div class="status-grid">
+        <div class="status-item">
+          <div class="status-label">WiFi状态</div>
+          <div class="status-value" id="wifiStatus">--</div>
+        </div>
+        <div class="status-item">
+          <div class="status-label">当前屏幕</div>
+          <div class="status-value" id="screenStatus">--</div>
+        </div>
+        <div class="status-item">
+          <div class="status-label">运行时间</div>
+          <div class="status-value" id="uptime">--</div>
+        </div>
+        <div class="status-item">
+          <div class="status-label">触摸次数</div>
+          <div class="status-value" id="touchCount">--</div>
+        </div>
+      </div>
+    </div>
+    
+    <!-- 屏幕控制 -->
+    <div class="control-section">
+      <h3>📺 屏幕控制</h3>
+      <div class="button-grid">
+        <button onclick="setScreen(0)">🏠 主屏幕</button>
+        <button onclick="setScreen(1)">📝 Demo 1</button>
+        <button onclick="setScreen(2)">📊 Demo 2</button>
+        <button onclick="setScreen(3)">💬 自定义</button>
+      </div>
+    </div>
+    
+    <!-- 显示控制 -->
+    <div class="control-section">
+      <h3>💡 显示控制</h3>
+      <div class="button-grid">
+        <button onclick="toggleDisplay(true)" class="success">✅ 开启显示</button>
+        <button onclick="toggleDisplay(false)" class="secondary">❌ 关闭显示</button>
+      </div>
+    </div>
+    
+    <!-- 消息发送 -->
+    <div class="control-section">
+      <h3>✉️ 发送消息</h3>
+      <input type="text" class="message-input" id="customMessage" placeholder="输入要在屏幕上显示的消息...">
+      <button onclick="sendMessage()" class="full-width">📤 发送到屏幕</button>
+    </div>
+  </div>
+  
+  <script>
+    let deviceIP = '192.168.4.1';
+    let updateInterval = null;
+    let isConnected = false;
+    
+    // 页面加载时初始化
+    window.onload = function() {
+      const savedIP = localStorage.getItem('esp32_ip');
+      if (savedIP) {
+        document.getElementById('deviceIP').value = savedIP;
+        deviceIP = savedIP;
+        connectDevice();
+      }
+    };
+    
+    // 连接设备
+    function connectDevice() {
+      const ipInput = document.getElementById('deviceIP').value.trim();
+      if (!ipInput) {
+        showAlert('请输入有效的IP地址', 'error');
+        return;
+      }
+      
+      deviceIP = ipInput;
+      localStorage.setItem('esp32_ip', deviceIP);
+      
+      showAlert('正在连接到 ' + deviceIP + '...', 'success');
+      
+      // 测试连接
+      fetchStatus().then(success => {
+        if (success) {
+          isConnected = true;
+          updateConnectionIndicator(true);
+          showAlert('✅ 已成功连接到设备！', 'success');
+          
+          // 开始定时更新状态
+          if (updateInterval) clearInterval(updateInterval);
+          updateInterval = setInterval(fetchStatus, 2000);
+        } else {
+          isConnected = false;
+          updateConnectionIndicator(false);
+          showAlert('❌ 连接失败，请检查IP地址和设备状态', 'error');
+        }
+      });
+    }
+    
+    // 获取设备状态
+    async function fetchStatus() {
+      try {
+        const response = await fetch(`http://${deviceIP}/api/status`);
+        if (!response.ok) throw new Error('Network response was not ok');
+        
+        const data = await response.json();
+        
+        document.getElementById('wifiStatus').textContent = data.wifiConnected ? '✅ 已连接' : '❌ 未连接';
+        document.getElementById('screenStatus').textContent = getScreenName(data.currentScreen);
+        document.getElementById('uptime').textContent = formatUptime(data.uptime);
+        document.getElementById('touchCount').textContent = data.touchCount;
+        
+        if (!isConnected) {
+          isConnected = true;
+          updateConnectionIndicator(true);
+        }
+        
+        return true;
+      } catch (error) {
+        console.error('Error fetching status:', error);
+        if (isConnected) {
+          isConnected = false;
+          updateConnectionIndicator(false);
+          showAlert('设备连接已断开', 'error');
+        }
+        return false;
+      }
+    }
+    
+    // 切换屏幕
+    async function setScreen(screen) {
+      try {
+        const response = await fetch(`http://${deviceIP}/api/screen`, {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({screen: screen})
+        });
+        
+        if (response.ok) {
+          showAlert(`✅ 已切换到 ${getScreenName(screen)}`, 'success');
+          setTimeout(fetchStatus, 200);
+        } else {
+          throw new Error('Failed to set screen');
+        }
+      } catch (error) {
+        showAlert('❌ 切换屏幕失败', 'error');
+      }
+    }
+    
+    // 控制显示
+    async function toggleDisplay(enabled) {
+      try {
+        const response = await fetch(`http://${deviceIP}/api/display`, {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({enabled: enabled})
+        });
+        
+        if (response.ok) {
+          showAlert(enabled ? '✅ 显示已开启' : '✅ 显示已关闭', 'success');
+        } else {
+          throw new Error('Failed to toggle display');
+        }
+      } catch (error) {
+        showAlert('❌ 控制显示失败', 'error');
+      }
+    }
+    
+    // 发送消息
+    async function sendMessage() {
+      const message = document.getElementById('customMessage').value.trim();
+      if (!message) {
+        showAlert('请输入消息内容', 'error');
+        return;
+      }
+      
+      try {
+        const response = await fetch(`http://${deviceIP}/api/message`, {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({message: message})
+        });
+        
+        if (response.ok) {
+          showAlert('✅ 消息已发送', 'success');
+          // 自动切换到自定义消息屏幕
+          setTimeout(() => setScreen(3), 300);
+          document.getElementById('customMessage').value = '';
+        } else {
+          throw new Error('Failed to send message');
+        }
+      } catch (error) {
+        showAlert('❌ 发送消息失败', 'error');
+      }
+    }
+    
+    // 工具函数
+    function showAlert(message, type) {
+      const alert = document.getElementById('alert');
+      alert.textContent = message;
+      alert.className = `alert ${type} show`;
+      
+      setTimeout(() => {
+        alert.classList.remove('show');
+      }, 3000);
+    }
+    
+    function updateConnectionIndicator(connected) {
+      const indicator = document.getElementById('connectionIndicator');
+      indicator.className = `connection-indicator ${connected ? 'connected' : 'disconnected'}`;
+    }
+    
+    function getScreenName(screen) {
+      const names = ['主屏幕', 'Demo 1', 'Demo 2', '自定义消息'];
+      return names[screen] || '未知';
+    }
+    
+    function formatUptime(ms) {
+      const seconds = Math.floor(ms / 1000);
+      const minutes = Math.floor(seconds / 60);
+      const hours = Math.floor(minutes / 60);
+      
+      if (hours > 0) {
+        return `${hours}小时 ${minutes % 60}分`;
+      } else if (minutes > 0) {
+        return `${minutes}分 ${seconds % 60}秒`;
+      } else {
+        return `${seconds}秒`;
+      }
+    }
+  </script>
+</body>
+</html>
